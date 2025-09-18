@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Minecraft Sunucu Paneli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+  <div id="main" class="bg-gray-800 p-6 rounded-2xl shadow-xl w-96 text-center">
+    <h1 class="text-2xl font-bold mb-4">Minecraft Sunucu Paneli</h1>
+
+    <div id="server-info" class="mb-4">
+      <p>Sunucu bilgileri yükleniyor...</p>
+    </div>
+
+    <button id="action-btn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl font-semibold">
+      Sunucuyu Başlat
+    </button>
+  </div>
+
+  <!-- Loading Modal -->
+  <div id="loading-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg text-center w-80">
+      <p class="text-lg font-semibold mb-2">Sunucu başlatılıyor...</p>
+      <p class="text-sm text-gray-400">Lütfen bekleyin</p>
+      <div class="mt-4 animate-spin rounded-full h-10 w-10 border-4 border-green-400 border-t-transparent mx-auto"></div>
+    </div>
+  </div>
+
+  <!-- Error Modal -->
+  <div id="error-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+    <div class="bg-red-800 p-6 rounded-2xl shadow-lg text-center w-96">
+      <p class="text-lg font-semibold mb-2">Bir hata oluştu</p>
+      <p class="text-sm">Sunucuyu başlatma işlemi zaman aşımına uğradı.<br>Lütfen sunucuyu başlatma talebi için server sahibi ile iletişime geçin.</p>
+      <button onclick="closeError()" class="mt-4 bg-gray-200 text-black px-4 py-2 rounded-xl font-semibold">
+        Kapat
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://api.mcsrvstat.us/bedrock/3/biroynayamadik.aternos.me:19681";
+    const WEBHOOK_URL = "https://senin-webhook-urlin.com"; 
+    const REDIRECT_URL = "https://add.aternos.org/biroynayamadik";
+    const MANUAL_IP = "biroynayamadik.aternos.me";
+
+    let serverOnline = false;
+
+    async function fetchServerInfo() {
+      try {
+        const response = await fetch(API_URL);
+        return await response.json();
+      } catch (error) {
+        return null;
+      }
+    }
+
+    async function updateServerInfo() {
+      const data = await fetchServerInfo();
+      const infoDiv = document.getElementById("server-info");
+
+      if (!data) {
+        infoDiv.innerHTML = `<p class="text-red-400">Bilgiler alınamadı.</p>`;
+        return;
+      }
+
+      serverOnline = data.online;
+
+      let infoHTML = `
+        <p><strong>IP:</strong> ${MANUAL_IP}</p>
+        <p><strong>Port:</strong> ${data.port || "?"}</p>
+      `;
+
+      if (data.players) {
+        infoHTML += `<p><strong>Oyuncular:</strong> ${data.players.online} / ${data.players.max}</p>`;
+      } else {
+        infoHTML += `<p><strong>Oyuncular:</strong> Bilgi yok</p>`;
+      }
+
+      if (data.online) {
+        infoHTML += `<p><strong>Durum:</strong> <span class="text-green-400">Online</span></p>`;
+        document.getElementById("action-btn").textContent = "Sunucuya Bağlan";
+        document.getElementById("action-btn").onclick = () => { window.location.href = REDIRECT_URL; };
+      } else {
+        infoHTML += `<p><strong>Durum:</strong> <span class="text-red-400">Kapalı</span></p>`;
+        document.getElementById("action-btn").textContent = "Sunucuyu Başlat";
+        document.getElementById("action-btn").onclick = startServer;
+      }
+
+      infoDiv.innerHTML = infoHTML;
+    }
+
+    async function startServer() {
+      document.getElementById("loading-modal").classList.remove("hidden");
+
+      try {
+        await fetch(WEBHOOK_URL, { method: "POST" });
+      } catch (err) {
+        showError();
+        return;
+      }
+
+      const startTime = Date.now();
+      const timeout = 90000;
+
+      const checkInterval = setInterval(async () => {
+        const data = await fetchServerInfo();
+        if (data && data.online) {
+          clearInterval(checkInterval);
+          document.getElementById("loading-modal").classList.add("hidden");
+          updateServerInfo(); // ana ekranı güncelle
+        } else if (Date.now() - startTime > timeout) {
+          clearInterval(checkInterval);
+          showError();
+        }
+      }, 5000);
+    }
+
+    function showError() {
+      document.getElementById("loading-modal").classList.add("hidden");
+      document.getElementById("error-modal").classList.remove("hidden");
+    }
+
+    function closeError() {
+      document.getElementById("error-modal").classList.add("hidden");
+    }
+
+    updateServerInfo();
+    setInterval(updateServerInfo, 10000);
+  </script>
+</body>
+</html>
